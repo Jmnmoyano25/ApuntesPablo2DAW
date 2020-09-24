@@ -1,0 +1,146 @@
+****rutas o ENDPOINTS
+
+
+cliente-------------------------------------------> servidor web asp.net core
+
+https://localhost:Xxx/segmento1/segmento2/segmento3?variable=valor&....
+--------------					----------->
+no se toma en cuenta				http-request    KESTREL (PIPELINE)
+						--------------------------
+						MODULO1	-..-> modulo enrutado
+								     ||
+							split de la URL:
+							segmento1=valor1
+		           valores =>			segmento2=valor2
+			de enrutamiento (routeValues)	segmento3=valor3
+
+							? varable=valor &....
+							--------------------
+							QUERYSTRING de la ruta
+
+a continuación el modulo de enrutamiento va a colección de ENDPONTS o tabla rutas a buscar alguna coincidenica.
+Cada ENDPONTI se define:
+	-patron de la UEL a buscar
+	-acción a ejecutar si se cumple el patrón
+
+por defrecto, nos definen un ENDPONT lo mas generico posible:
+
+	endpoints.MapControllerRoute(
+			name: "default",
+			pattern: "{controller=Home}/{action=Index}/{id?}");
+			});
+
+ej. si el cliente pone esta url: https://localhost:xxxx:/PanelUsuario/MisPedidos
+							------------- ----------
+							segmento1	segmento2
+
+					controller=PanelUsuario		action=MisPedidos
+
+			controller (clase)
+			action     (metodo)
+
+https://localhost:xxxx/ 	---->segmento1:(no aparece) por defecto, controller=Home
+				---->segmento2:
+
+
+https://localhost:xxxxx/Tienda/Verlibro/0134-55284-85/2  (total cuatro segmentos), como el ENDPOINT generico solo coge 3 segmentos, Pantallazo!!!!
+
+
+crear un controlador:
+	
+
+
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpsPolicy;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using proyecto_prueba.Infraestructura.EndPoints;
+
+namespace proyecto_prueba
+{
+    public class Startup
+    {
+        public Startup(IConfiguration configuration)
+        {
+            Configuration = configuration;
+        }
+
+        public IConfiguration Configuration { get; }
+
+        // This method gets called by the runtime. Use this method to add services to the container.
+        public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddControllersWithViews();
+        }
+
+        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+            else
+            {
+                app.UseExceptionHandler("/Home/Error");
+                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+                app.UseHsts();
+            }
+            app.UseHttpsRedirection();
+            app.UseStaticFiles();
+
+            app.UseRouting();
+
+            app.UseAuthorization();
+
+            //-----middleware que detecta que endpoint va a ejecutar el modulo de enrutamiento-----
+            //-----ponerlo siempre tras el modulo app.UseRouting().......
+
+            //el metodo USE que define el middleware nedcesita como parametro una función LAMBDA, con dos pararametros,
+            //el 1º objeto Httpcontext,
+            //el 2º RequestDele
+            app.Use(async (contexto, next) => {
+                Endpoint end = contexto.GetEndpoint();
+                if (end != null)
+                {
+                    await contexto
+                          .Response
+                          .WriteAsync($"nngún endpoint selecónado, no se cumple ningún patron");
+                }
+
+                await next(); //invoca a siguiente modulo del middleware
+            }); 
+
+
+            app.UseEndpoints(endpoints =>
+            {
+                //........1º endpoint (endpoint por defecto)
+                endpoints.MapControllerRoute(
+                    name: "default",
+                    pattern: "{controller=Home}/{action=Index}/{id?}")
+                    .WithDisplayName("endpoint por defecto");
+
+                //........2º endpoint
+                endpoints.MapGet("/capitalPais/{pais}", CapitalPaises.EndPoint);
+                //es mas restrictivo por que tiene un segmento literal (/capitalPais
+            });
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
